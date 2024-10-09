@@ -719,10 +719,23 @@ TEST_CASE_METHOD(TApp, "Required1SubCom", "[subcom]") {
     CHECK_THROWS_AS(run(), CLI::RequiredError);
 
     args = {"sub1"};
-    run();
+    CHECK_NOTHROW(run());
 
     args = {"sub1", "sub2"};
     CHECK_THROWS_AS(run(), CLI::ExtrasError);
+}
+
+TEST_CASE_METHOD(TApp, "subcomNoSubComfallthrough", "[subcom]") {
+    auto *sub1 = app.add_subcommand("sub1");
+    std::vector<std::string> pos;
+    sub1->add_option("args", pos);
+    app.add_subcommand("sub2");
+    app.add_subcommand("sub3");
+    sub1->subcommand_fallthrough(false);
+    CHECK_FALSE(sub1->get_subcommand_fallthrough());
+    args = {"sub1", "sub2", "sub3"};
+    run();
+    CHECK(pos.size() == 2);
 }
 
 TEST_CASE_METHOD(TApp, "BadSubcommandSearch", "[subcom]") {
@@ -1013,18 +1026,18 @@ TEST_CASE_METHOD(SubcommandProgram, "Subcommand Groups", "[subcom]") {
 
     std::string help = app.help();
     CHECK_THAT(help, !Contains("More Commands:"));
-    CHECK_THAT(help, Contains("Subcommands:"));
+    CHECK_THAT(help, Contains("SUBCOMMANDS:"));
 
     start->group("More Commands");
     help = app.help();
     CHECK_THAT(help, Contains("More Commands:"));
-    CHECK_THAT(help, Contains("Subcommands:"));
+    CHECK_THAT(help, Contains("SUBCOMMANDS:"));
 
     // Case is ignored but for the first subcommand in a group.
     stop->group("more commands");
     help = app.help();
     CHECK_THAT(help, Contains("More Commands:"));
-    CHECK_THAT(help, !Contains("Subcommands:"));
+    CHECK_THAT(help, !Contains("SUBCOMMANDS:"));
 }
 
 TEST_CASE_METHOD(SubcommandProgram, "Subcommand ExtrasErrors", "[subcom]") {

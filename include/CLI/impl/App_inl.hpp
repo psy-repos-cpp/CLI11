@@ -1038,7 +1038,8 @@ CLI11_INLINE void App::run_callback(bool final_mode, bool suppress_final_callbac
 
 CLI11_NODISCARD CLI11_INLINE bool App::_valid_subcommand(const std::string &current, bool ignore_used) const {
     // Don't match if max has been reached - but still check parents
-    if(require_subcommand_max_ != 0 && parsed_subcommands_.size() >= require_subcommand_max_) {
+    if(require_subcommand_max_ != 0 && parsed_subcommands_.size() >= require_subcommand_max_ &&
+       subcommand_fallthrough_) {
         return parent_ != nullptr && parent_->_valid_subcommand(current, ignore_used);
     }
     auto *com = _find_subcommand(current, true, ignore_used);
@@ -1046,7 +1047,10 @@ CLI11_NODISCARD CLI11_INLINE bool App::_valid_subcommand(const std::string &curr
         return true;
     }
     // Check parent if exists, else return false
-    return parent_ != nullptr && parent_->_valid_subcommand(current, ignore_used);
+    if(subcommand_fallthrough_) {
+        return parent_ != nullptr && parent_->_valid_subcommand(current, ignore_used);
+    }
+    return false;
 }
 
 CLI11_NODISCARD CLI11_INLINE detail::Classifier App::_recognize(const std::string &current,
@@ -1743,9 +1747,9 @@ CLI11_INLINE bool App::_parse_positional(std::vector<std::string> &args, bool ha
         }
     }
     // let the parent deal with it if possible
-    if(parent_ != nullptr && fallthrough_)
+    if(parent_ != nullptr && fallthrough_) {
         return _get_fallthrough_parent()->_parse_positional(args, static_cast<bool>(parse_complete_callback_));
-
+    }
     /// Try to find a local subcommand that is repeated
     auto *com = _find_subcommand(args.back(), true, false);
     if(com != nullptr && (require_subcommand_max_ == 0 || require_subcommand_max_ > parsed_subcommands_.size())) {
@@ -1756,15 +1760,16 @@ CLI11_INLINE bool App::_parse_positional(std::vector<std::string> &args, bool ha
         com->_parse(args);
         return true;
     }
-    /// now try one last gasp at subcommands that have been executed before, go to root app and try to find a
-    /// subcommand in a broader way, if one exists let the parent deal with it
-    auto *parent_app = (parent_ != nullptr) ? _get_fallthrough_parent() : this;
-    com = parent_app->_find_subcommand(args.back(), true, false);
-    if(com != nullptr && (com->parent_->require_subcommand_max_ == 0 ||
-                          com->parent_->require_subcommand_max_ > com->parent_->parsed_subcommands_.size())) {
-        return false;
+    if(subcommand_fallthrough_) {
+        /// now try one last gasp at subcommands that have been executed before, go to root app and try to find a
+        /// subcommand in a broader way, if one exists let the parent deal with it
+        auto *parent_app = (parent_ != nullptr) ? _get_fallthrough_parent() : this;
+        com = parent_app->_find_subcommand(args.back(), true, false);
+        if(com != nullptr && (com->parent_->require_subcommand_max_ == 0 ||
+                              com->parent_->require_subcommand_max_ > com->parent_->parsed_subcommands_.size())) {
+            return false;
+        }
     }
-
     if(positionals_at_end_) {
         throw CLI::ExtrasError(name_, args);
     }
@@ -2265,11 +2270,14 @@ CLI11_INLINE void retire_option(App *app, Option *opt) {
         ->expected(option_copy->get_expected_min(), option_copy->get_expected_max())
         ->allow_extra_args(option_copy->get_allow_extra_args());
 
+    // LCOV_EXCL_START
+    // something odd with coverage on new compilers
     Validator retired_warning{[opt2](std::string &) {
                                   std::cout << "WARNING " << opt2->get_name() << " is retired and has no effect\n";
                                   return std::string();
                               },
                               ""};
+    // LCOV_EXCL_STOP
     retired_warning.application_index(0);
     opt2->check(retired_warning);
 }
@@ -2287,11 +2295,14 @@ CLI11_INLINE void retire_option(App *app, const std::string &option_name) {
                      ->type_name("RETIRED")
                      ->expected(0, 1)
                      ->default_str("RETIRED");
+    // LCOV_EXCL_START
+    // something odd with coverage on new compilers
     Validator retired_warning{[opt2](std::string &) {
                                   std::cout << "WARNING " << opt2->get_name() << " is retired and has no effect\n";
                                   return std::string();
                               },
                               ""};
+    // LCOV_EXCL_STOP
     retired_warning.application_index(0);
     opt2->check(retired_warning);
 }

@@ -54,7 +54,7 @@ template <typename CRTP> class OptionBase {
 
   protected:
     /// The group membership
-    std::string group_ = std::string("Options");
+    std::string group_ = std::string("OPTIONS");
 
     /// True if this is a required option
     bool required_{false};
@@ -547,7 +547,7 @@ class Option : public OptionBase<Option> {
 
     /// Get the flag names with specified default values
     CLI11_NODISCARD const std::vector<std::string> &get_fnames() const { return fnames_; }
-    /// Get a single name for the option, first of lname, pname, sname, envname
+    /// Get a single name for the option, first of lname, sname, pname, envname
     CLI11_NODISCARD const std::string &get_single_name() const {
         if(!lnames_.empty()) {
             return lnames_[0];
